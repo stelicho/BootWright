@@ -1,0 +1,9 @@
+# iPXE is cloned here at runtime by pxe.clone_or_update_ipxe(); not vendored into this repo.
+vendor/
+
+# Marks that the first-run dependency check has already run.
+.dependencies_checked
+
+# Python
+__pycache__/
+*.pyc
