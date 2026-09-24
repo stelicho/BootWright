@@ -216,12 +216,13 @@ def report(statuses: dict[str, bool]) -> None:
         print(f"  [{status}] {dep.name}")
 
 
-def ensure_dependencies_installed() -> None:
+def ensure_dependencies_installed(assume_yes: bool = False) -> None:
     """On first run only, check dependencies and offer to install any that are missing.
 
     Marks itself done via FIRST_RUN_MARKER regardless of outcome, so the
     menu doesn't re-prompt every launch -- rerun with --install (main())
-    directly if something was skipped and needs another pass.
+    directly if something was skipped and needs another pass. assume_yes
+    skips the per-package confirmation prompt (from the CLI's --yes).
     """
     if FIRST_RUN_MARKER.exists():
         return
@@ -238,7 +239,7 @@ def ensure_dependencies_installed() -> None:
             print("\nNo supported package manager detected; install the above manually.")
         else:
             print(f"\nUsing package manager: {manager}")
-            install_missing(manager, missing, assume_yes=False)
+            install_missing(manager, missing, assume_yes=assume_yes)
     else:
         print("\nAll dependencies satisfied.")
 

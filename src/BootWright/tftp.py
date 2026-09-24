@@ -94,6 +94,18 @@ def add_custom_iso(iso_path: Path, tftp_root: Path, folder_name: str) -> Path:
     return destination
 
 
+def add_background_image(image_path: Path, tftp_root: Path) -> Path:
+    """Copy a user-supplied background image directly into tftp_root, returning its new path.
+
+    Placed at the root (not a subfolder) so boot.ipxe can reference it by
+    a bare filename. Collision-safe like add_custom_iso, for the same
+    reason: a one-off user-supplied asset, not a rebuild with a stable name.
+    """
+    destination = _avoid_collision(tftp_root / image_path.name)
+    shutil.copy2(str(image_path), str(destination))
+    return destination
+
+
 def linux_iso_destination(distro_key: str, tftp_root: Path) -> Path:
     """Return where download_linux_iso() would place distro_key's ISO, without downloading it."""
     entry = LINUX_ISO_CATALOG[distro_key]

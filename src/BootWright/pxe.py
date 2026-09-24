@@ -12,6 +12,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from . import bootscript
+
 PACKAGE_ROOT = Path(__file__).resolve().parent
 IPXE_REPO_URL = "https://github.com/ipxe/ipxe.git"
 IPXE_SRC_DIR = PACKAGE_ROOT / "vendor" / "ipxe"
@@ -147,8 +149,29 @@ def write_local_config(selected_macros: set[str], config_path: Path = LOCAL_CONF
     return config_path
 
 
-def build_target(target_key: str, build_dir: Path = IPXE_BUILD_DIR) -> Path:
-    """Run make for a single target key from TARGETS, returning its bin directory."""
+def write_embed_script(build_dir: Path = IPXE_BUILD_DIR) -> Path:
+    """Write bootscript.DEFAULT_EMBED_SCRIPT to a fixed path make can EMBED=.
+
+    The embed script is static (see bootscript.DEFAULT_EMBED_SCRIPT), so
+    this only needs writing once regardless of which/how many targets
+    get built.
+    """
+    destination = build_dir / ".bootwright-embed.ipxe"
+    destination.write_text(bootscript.DEFAULT_EMBED_SCRIPT)
+    return destination
+
+
+def build_target(
+    target_key: str,
+    build_dir: Path = IPXE_BUILD_DIR,
+    selected_macros: set[str] | None = None,
+) -> Path:
+    """Run make for a single target key from TARGETS, returning its bin directory.
+
+    Every build gets EMBED=<the static bootstrap script>, so the result
+    auto-chains to boot.ipxe at boot. That requires IMAGE_SCRIPT to be
+    enabled; selected_macros is optional and only used to warn if it isn't.
+    """
     target = TARGETS[target_key]
     cross_compile = target["cross_compile"]
 
@@ -158,8 +181,16 @@ def build_target(target_key: str, build_dir: Path = IPXE_BUILD_DIR) -> Path:
             f"No '{compiler}' found on PATH; required to build '{target['label']}'."
         )
 
+    if selected_macros is not None and "IMAGE_SCRIPT" not in selected_macros:
+        print(
+            "Warning: IMAGE_SCRIPT is disabled -- the embedded bootstrap script "
+            "won't run, so this image won't auto-chain to boot.ipxe."
+        )
+
+    embed_script = write_embed_script(build_dir)
+
     make_targets = [f"{target['bin']}/{output}" for output in target["outputs"]]
-    command = ["make"]
+    command = ["make", f"EMBED={embed_script}"]
     if cross_compile:
         command.append(f"CROSS_COMPILE={cross_compile}")
     command.extend(make_targets)
@@ -168,9 +199,13 @@ def build_target(target_key: str, build_dir: Path = IPXE_BUILD_DIR) -> Path:
     return build_dir / target["bin"]
 
 
-def build_targets(target_keys: list[str], build_dir: Path = IPXE_BUILD_DIR) -> dict[str, Path]:
+def build_targets(
+    target_keys: list[str],
+    build_dir: Path = IPXE_BUILD_DIR,
+    selected_macros: set[str] | None = None,
+) -> dict[str, Path]:
     """Build each requested target, returning a mapping of target key to its bin directory."""
-    return {key: build_target(key, build_dir) for key in target_keys}
+    return {key: build_target(key, build_dir, selected_macros) for key in target_keys}
 
 
 def list_build_outputs(build_results: dict[str, Path]) -> list[tuple[str, Path]]:

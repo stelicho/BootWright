@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from . import dependencies, pxe, tftp
+from . import bootscript, dependencies, pxe, services, tftp
 
 
 def prompt_yes_no(question: str, default: bool) -> bool:
@@ -73,9 +73,9 @@ def select_images_to_deploy(produced: list[tuple[str, Path]]) -> list[tuple[Path
     return chosen
 
 
-def resolve_tftp_root() -> Path | None:
+def resolve_tftp_root(initial_candidate: Path | None = None) -> Path | None:
     """Ensure the platform's TFTP root exists, letting the user retry with another path on failure."""
-    candidate = tftp.default_tftp_root()
+    candidate = initial_candidate or tftp.default_tftp_root()
     while True:
         try:
             return tftp.ensure_tftp_root(candidate)
@@ -90,30 +90,34 @@ def resolve_tftp_root() -> Path | None:
             candidate = Path(raw).expanduser()
 
 
-def offer_custom_iso(tftp_root: Path) -> None:
+def offer_custom_iso(tftp_root: Path) -> bootscript.MenuEntry | None:
     if not prompt_yes_no("\nDo you have a custom .iso you'd like to add?", False):
-        return
+        return None
 
     raw_path = input("Path to the .iso file: ").strip()
     iso_path = Path(raw_path).expanduser()
     if not iso_path.is_file():
         print(f"  {iso_path} not found, skipping.")
-        return
+        return None
 
     folder_name = input("Folder name to place it under (e.g. mycustomrom): ").strip()
     if not folder_name:
         print("  No folder name given, skipping.")
-        return
+        return None
 
     destination = tftp.add_custom_iso(iso_path, tftp_root, folder_name)
     if destination.name != iso_path.name:
         print(f"  Note: {iso_path.name} already existed there; saved as {destination.name}")
     print(f"  Added {destination}")
 
+    label = input("Menu label for this entry (blank to use the filename): ").strip()
+    relative_path = destination.relative_to(tftp_root).as_posix()
+    return bootscript.iso_entry(label or destination.stem, relative_path)
 
-def offer_linux_iso_download(tftp_root: Path) -> None:
+
+def offer_linux_iso_download(tftp_root: Path) -> bootscript.MenuEntry | None:
     if not prompt_yes_no("\nDownload a Linux install ISO?", False):
-        return
+        return None
 
     catalog_keys = list(tftp.LINUX_ISO_CATALOG.keys())
     print("Available distros:")
@@ -122,22 +126,82 @@ def offer_linux_iso_download(tftp_root: Path) -> None:
 
     raw = input(f"Select a distro [1-{len(catalog_keys)}], or blank to skip: ").strip()
     if not raw.isdigit() or not (0 < int(raw) <= len(catalog_keys)):
-        return
+        return None
 
     distro_key = catalog_keys[int(raw) - 1]
+    entry_info = tftp.LINUX_ISO_CATALOG[distro_key]
     if tftp.linux_iso_destination(distro_key, tftp_root).exists():
-        print(f"  {tftp.LINUX_ISO_CATALOG[distro_key]['label']} already present, skipping download.")
+        print(f"  {entry_info['label']} already present, skipping download.")
     else:
-        print(f"  Downloading {tftp.LINUX_ISO_CATALOG[distro_key]['label']} ...")
+        print(f"  Downloading {entry_info['label']} ...")
     destination = tftp.download_linux_iso(distro_key, tftp_root)
     print(f"  Added {destination}")
 
+    relative_path = destination.relative_to(tftp_root).as_posix()
+    return bootscript.iso_entry(entry_info["label"], relative_path)
 
-def run() -> None:
+
+def offer_background_image(tftp_root: Path, selected_macros: set[str]) -> str | None:
+    """Ask for a boot-menu background image; returns a URI/filename for bootscript, or None."""
+    if not prompt_yes_no("\nWould you like to set a background image for the boot menu?", False):
+        return None
+
+    required = {"CONSOLE_FRAMEBUFFER", "IMAGE_PNG"}
+    missing = required - selected_macros
+    if missing:
+        print(
+            f"  Note: {', '.join(sorted(missing))} weren't enabled for this build -- the "
+            "picture won't render until you rebuild with them on. Writing the menu "
+            "with it anyway so it's ready for next time."
+        )
+
+    raw = input("Local image path or URL (PNG recommended): ").strip()
+    if not raw:
+        return None
+
+    if raw.startswith(("http://", "https://", "tftp://")):
+        return raw
+
+    image_path = Path(raw).expanduser()
+    if not image_path.is_file():
+        print(f"  {image_path} not found, skipping background image.")
+        return None
+
+    destination = tftp.add_background_image(image_path, tftp_root)
+    print(f"  Added {destination}")
+    return destination.name
+
+
+def offer_tftp_service(tftp_root: Path) -> None:
+    if not prompt_yes_no("\nEnable/start a TFTP server for this TFTP root?", False):
+        return
+    services.enable_tftp_service(tftp_root)
+
+
+def offer_http_service(tftp_root: Path) -> int | None:
+    if not prompt_yes_no("\nStart an HTTP server to serve the same TFTP root?", False):
+        return None
+
+    port_raw = input("Port to serve on [8080]: ").strip()
+    port = int(port_raw) if port_raw.isdigit() else 8080
+    process = services.start_http_server(tftp_root, port)
+    print(
+        f"  Serving {tftp_root} on port {port} in the background (pid {process.pid}). "
+        f"It keeps running after BootWright exits; stop it later with: kill {process.pid}"
+    )
+    return port
+
+
+def run(
+    skip_dependencies: bool = False,
+    tftp_root_override: Path | None = None,
+    assume_yes: bool = False,
+) -> None:
     """Run the interactive configure/build/deploy flow end to end."""
     print("BootWright - iPXE Boot Environment Builder")
 
-    dependencies.ensure_dependencies_installed()
+    if not skip_dependencies:
+        dependencies.ensure_dependencies_installed(assume_yes=assume_yes)
 
     print(f"\nSyncing iPXE source into {pxe.IPXE_SRC_DIR} ...")
     pxe.clone_or_update_ipxe()
@@ -152,10 +216,10 @@ def run() -> None:
         return
 
     print(f"\nBuilding: {', '.join(pxe.TARGETS[key]['label'] for key in target_keys)}")
-    build_results = pxe.build_targets(target_keys)
+    build_results = pxe.build_targets(target_keys, selected_macros=selected_macros)
     produced_images = pxe.list_build_outputs(build_results)
 
-    tftp_root = resolve_tftp_root()
+    tftp_root = resolve_tftp_root(tftp_root_override)
     if tftp_root is None:
         print("No TFTP root available, leaving built images in place.")
         return
@@ -166,8 +230,27 @@ def run() -> None:
     for path in deployed:
         print(f"  Deployed {path}")
 
-    offer_custom_iso(tftp_root)
-    offer_linux_iso_download(tftp_root)
+    menu_entries = [bootscript.local_disk_entry()]
+    if "SHELL_CMD" in selected_macros:
+        menu_entries.append(bootscript.shell_entry())
+
+    custom_entry = offer_custom_iso(tftp_root)
+    if custom_entry is not None:
+        menu_entries.append(custom_entry)
+
+    linux_entry = offer_linux_iso_download(tftp_root)
+    if linux_entry is not None:
+        menu_entries.append(linux_entry)
+
+    background_url = offer_background_image(tftp_root, selected_macros)
+
+    menu_path = bootscript.write_boot_menu(tftp_root, menu_entries, background_url)
+    print(f"\nWrote boot menu to {menu_path}")
+
+    offer_tftp_service(tftp_root)
+    http_port = offer_http_service(tftp_root)
+
+    services.print_dhcp_advice(tftp_root, [path.name for path in deployed], http_port)
 
 
 if __name__ == "__main__":
