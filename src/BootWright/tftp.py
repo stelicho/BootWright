@@ -16,18 +16,74 @@ DEFAULT_TFTP_ROOTS: dict[str, Path] = {
 }
 FALLBACK_TFTP_ROOT = Path("/tftpboot")
 
-# Known Linux installer ISOs BootWright can fetch automatically. Minimal
-# starter set -- more distros/mirrors/architectures to be added later.
+# Known Linux installer ISOs BootWright can fetch automatically. URLs are
+# pinned to specific point releases (per-distro exceptions noted below) and
+# will go stale as new releases ship -- see ROADMAP.md.
 LINUX_ISO_CATALOG: dict[str, dict[str, str]] = {
-    "debian": {
-        "label": "Debian 12 (bookworm) netinst, amd64",
-        "url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-12.9.0-amd64-netinst.iso",
+    "debian-amd64": {
+        "label": "Debian 13 (trixie) netinst, amd64",
+        "url": "https://cdimage.debian.org/debian-cd/current/amd64/iso-cd/debian-13.7.0-amd64-netinst.iso",
         "subdir": "debian",
     },
-    "fedora": {
-        "label": "Fedora Server 41 netinst, x86_64",
-        "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/41/Server/x86_64/iso/Fedora-Server-netinst-x86_64-41-1.4.iso",
+    "debian-arm64": {
+        "label": "Debian 13 (trixie) netinst, arm64",
+        "url": "https://cdimage.debian.org/debian-cd/current/arm64/iso-cd/debian-13.7.0-arm64-netinst.iso",
+        "subdir": "debian",
+    },
+    "ubuntu-amd64": {
+        "label": "Ubuntu Server 24.04.5 LTS (Noble Numbat), amd64",
+        "url": "https://releases.ubuntu.com/noble/ubuntu-24.04.5-live-server-amd64.iso",
+        "subdir": "ubuntu",
+    },
+    "fedora-amd64": {
+        "label": "Fedora Server 43 netinst, x86_64",
+        "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/x86_64/iso/Fedora-Server-netinst-x86_64-43-1.6.iso",
         "subdir": "fedora",
+    },
+    "fedora-arm64": {
+        "label": "Fedora Server 43 netinst, aarch64",
+        "url": "https://download.fedoraproject.org/pub/fedora/linux/releases/43/Server/aarch64/iso/Fedora-Server-netinst-aarch64-43-1.6.iso",
+        "subdir": "fedora",
+    },
+    "rocky-amd64": {
+        "label": "Rocky Linux 9.8 minimal, x86_64",
+        "url": "https://download.rockylinux.org/pub/rocky/9/isos/x86_64/Rocky-9.8-x86_64-minimal.iso",
+        "subdir": "rocky",
+    },
+    "rocky-arm64": {
+        "label": "Rocky Linux 9.8 minimal, aarch64",
+        "url": "https://download.rockylinux.org/pub/rocky/9/isos/aarch64/Rocky-9.8-aarch64-minimal.iso",
+        "subdir": "rocky",
+    },
+    "almalinux-amd64": {
+        # "-latest-" is AlmaLinux's own self-updating alias for the newest
+        # point release, so unlike most other entries here this one doesn't
+        # need to be re-pinned as new point releases ship.
+        "label": "AlmaLinux 9 minimal (latest), x86_64",
+        "url": "https://repo.almalinux.org/almalinux/9/isos/x86_64/AlmaLinux-9-latest-x86_64-minimal.iso",
+        "subdir": "almalinux",
+    },
+    "almalinux-arm64": {
+        "label": "AlmaLinux 9 minimal (latest), aarch64",
+        "url": "https://repo.almalinux.org/almalinux/9/isos/aarch64/AlmaLinux-9-latest-aarch64-minimal.iso",
+        "subdir": "almalinux",
+    },
+    "opensuse-leap-amd64": {
+        "label": "openSUSE Leap 15.6 network installer, x86_64",
+        "url": "https://download.opensuse.org/distribution/leap/15.6/iso/openSUSE-Leap-15.6-NET-x86_64-Media.iso",
+        "subdir": "opensuse",
+    },
+    "archlinux-amd64": {
+        # kernel.org's "latest" alias is also self-updating, same caveat as
+        # AlmaLinux above.
+        "label": "Arch Linux (latest), x86_64",
+        "url": "https://mirrors.edge.kernel.org/archlinux/iso/latest/archlinux-x86_64.iso",
+        "subdir": "archlinux",
+    },
+    "alpine-amd64": {
+        "label": "Alpine Linux 3.24.2 standard, x86_64",
+        "url": "https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64/alpine-standard-3.24.2-x86_64.iso",
+        "subdir": "alpine",
     },
 }
 

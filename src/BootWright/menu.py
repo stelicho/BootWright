@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from . import bootscript, dependencies, pxe, services, tftp
+from . import bootscript, dependencies, pxe, services, tftp, winpe
 
 
 def prompt_yes_no(question: str, default: bool) -> bool:
@@ -115,30 +115,41 @@ def offer_custom_iso(tftp_root: Path) -> bootscript.MenuEntry | None:
     return bootscript.iso_entry(label or destination.stem, relative_path)
 
 
-def offer_linux_iso_download(tftp_root: Path) -> bootscript.MenuEntry | None:
+def offer_linux_iso_download(tftp_root: Path) -> list[bootscript.MenuEntry]:
+    """Offer the catalogued Linux installer ISOs, letting the user download any number of them."""
     if not prompt_yes_no("\nDownload a Linux install ISO?", False):
-        return None
+        return []
 
     catalog_keys = list(tftp.LINUX_ISO_CATALOG.keys())
     print("Available distros:")
     for index, key in enumerate(catalog_keys, start=1):
         print(f"  {index}. {tftp.LINUX_ISO_CATALOG[key]['label']}")
 
-    raw = input(f"Select a distro [1-{len(catalog_keys)}], or blank to skip: ").strip()
-    if not raw.isdigit() or not (0 < int(raw) <= len(catalog_keys)):
-        return None
-
-    distro_key = catalog_keys[int(raw) - 1]
-    entry_info = tftp.LINUX_ISO_CATALOG[distro_key]
-    if tftp.linux_iso_destination(distro_key, tftp_root).exists():
-        print(f"  {entry_info['label']} already present, skipping download.")
+    raw = input(
+        f"Select distros to download (comma-separated numbers, or 'all') [1-{len(catalog_keys)}]: "
+    ).strip().lower()
+    if raw == "all":
+        chosen_keys = catalog_keys
     else:
-        print(f"  Downloading {entry_info['label']} ...")
-    destination = tftp.download_linux_iso(distro_key, tftp_root)
-    print(f"  Added {destination}")
+        chosen_keys = []
+        for part in raw.split(","):
+            part = part.strip()
+            if part.isdigit() and 0 < int(part) <= len(catalog_keys):
+                chosen_keys.append(catalog_keys[int(part) - 1])
 
-    relative_path = destination.relative_to(tftp_root).as_posix()
-    return bootscript.iso_entry(entry_info["label"], relative_path)
+    entries = []
+    for distro_key in chosen_keys:
+        entry_info = tftp.LINUX_ISO_CATALOG[distro_key]
+        if tftp.linux_iso_destination(distro_key, tftp_root).exists():
+            print(f"  {entry_info['label']} already present, skipping download.")
+        else:
+            print(f"  Downloading {entry_info['label']} ...")
+        destination = tftp.download_linux_iso(distro_key, tftp_root)
+        print(f"  Added {destination}")
+
+        relative_path = destination.relative_to(tftp_root).as_posix()
+        entries.append(bootscript.iso_entry(entry_info["label"], relative_path))
+    return entries
 
 
 def offer_background_image(tftp_root: Path, selected_macros: set[str]) -> str | None:
@@ -170,6 +181,16 @@ def offer_background_image(tftp_root: Path, selected_macros: set[str]) -> str | 
     destination = tftp.add_background_image(image_path, tftp_root)
     print(f"  Added {destination}")
     return destination.name
+
+
+def offer_winpe_guidance(tftp_root: Path, http_port: int | None) -> None:
+    if not prompt_yes_no(
+        "\nWould you like guidance on setting up a WinPE network boot and a Windows "
+        "install fileshare?",
+        False,
+    ):
+        return
+    winpe.print_winpe_guidance(tftp_root, http_port)
 
 
 def offer_tftp_service(tftp_root: Path) -> None:
@@ -238,9 +259,7 @@ def run(
     if custom_entry is not None:
         menu_entries.append(custom_entry)
 
-    linux_entry = offer_linux_iso_download(tftp_root)
-    if linux_entry is not None:
-        menu_entries.append(linux_entry)
+    menu_entries.extend(offer_linux_iso_download(tftp_root))
 
     background_url = offer_background_image(tftp_root, selected_macros)
 
@@ -249,6 +268,7 @@ def run(
 
     offer_tftp_service(tftp_root)
     http_port = offer_http_service(tftp_root)
+    offer_winpe_guidance(tftp_root, http_port)
 
     services.print_dhcp_advice(tftp_root, [path.name for path in deployed], http_port)
 

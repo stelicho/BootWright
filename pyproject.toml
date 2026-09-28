@@ -9,9 +9,46 @@ description = "Automate building and deploying a PXE boot environment on top of 
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
+keywords = ["ipxe", "pxe", "netboot", "tftp", "boot"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Boot",
+    "Topic :: System :: Installation/Setup",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pylint>=3"]
 
 [project.scripts]
 bootwright = "BootWright.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["BootWright*"]
+exclude = ["BootWright.vendor*"]
+
+[tool.pylint.main]
+ignore-paths = ["^src/BootWright/vendor/.*$"]
+
+[tool.pylint.format]
+# Several dict literals hold long distro/package-manager URLs; widening the
+# limit avoids wrapping those mid-string.
+max-line-length = 145
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-function-docstring",
+    "missing-class-docstring",
+    "missing-module-docstring",
+]
+
+[tool.pylint.design]
+max-locals = 20

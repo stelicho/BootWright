@@ -1,5 +1,8 @@
 # BootWright
 
+[![Pylint](https://github.com/stelicho/BootWright/actions/workflows/pylint.yml/badge.svg)](https://github.com/stelicho/BootWright/actions/workflows/pylint.yml)
+[![Tests](https://github.com/stelicho/BootWright/actions/workflows/tests.yml/badge.svg)](https://github.com/stelicho/BootWright/actions/workflows/tests.yml)
+
 BootWright is a collection of Python scripts that automate building a fully
 functional PXE boot environment on top of [iPXE](https://ipxe.org). It walks
 you through checking build dependencies, choosing which iPXE features and
@@ -28,8 +31,16 @@ downloaded installer ISOs.
 - **TFTP root deployment** (`tftp.py`) -- creates/verifies the platform's
   conventional TFTP root (`C:\tftpboot`, `/private/tftpboot`,
   `/srv/tftpboot`, or `/tftpboot`), moves the built images in with
-  collision-safe naming, and can add a custom `.iso` or download a
-  catalogued Linux installer ISO into its own subfolder.
+  collision-safe naming, and can add a custom `.iso` or download any of a
+  dozen catalogued Linux installer ISOs (Debian, Ubuntu, Fedora, Rocky,
+  AlmaLinux, openSUSE, Arch, Alpine, across amd64/arm64 where available)
+  into its own subfolder.
+- **WinPE / Windows install guidance** (`winpe.py`) -- prints a walkthrough,
+  based on [iPXE's own wiki](https://ipxe.org/howto/winpe), for building a
+  WinPE network-boot image with the Windows ADK and installing Windows onto
+  a client from a fileshare. This is guidance only: creating the WinPE image
+  requires Microsoft's Windows-only tooling, so BootWright doesn't attempt
+  to automate it.
 - **Interactive menu** (`menu.py`) -- ties all of the above together into
   a single guided flow.
 
@@ -44,13 +55,24 @@ downloaded installer ISOs.
   an ARM cross-compiler (e.g. `aarch64-linux-gnu-gcc`,
   `arm-linux-gnueabihf-gcc`) on `PATH`
 
-## Getting started
-
-Run from the parent directory of `BootWright/` so it's importable as a
-package:
+## Installation
 
 ```sh
-python3 -m BootWright.menu
+pip install .
+```
+
+or, for local development (editable install, plus `pytest`/`pylint`):
+
+```sh
+pip install -e ".[dev]"
+```
+
+This installs a `bootwright` console command.
+
+## Getting started
+
+```sh
+bootwright
 ```
 
 On first run this checks your platform's iPXE build dependencies and
@@ -61,12 +83,19 @@ offers to install anything missing. It then walks you through:
 3. Building the selected images
 4. Creating/verifying your TFTP root
 5. Choosing which built images to deploy into it
-6. Optionally adding a custom ISO or downloading a Linux installer ISO
+6. Optionally adding a custom ISO, downloading catalogued Linux installer
+   ISOs, and setting a boot menu background
+7. Optionally enabling a TFTP/HTTP service and getting WinPE/Windows-install
+   guidance
+
+`bootwright --help` lists flags for skipping the dependency check
+(`--no-depends`), overriding the TFTP root (`--tftp-root`), and
+auto-confirming dependency installs (`--yes`).
 
 You can also run the dependency checker on its own:
 
 ```sh
-python3 BootWright/dependencies.py --install
+python3 -m BootWright.dependencies --install
 ```
 
 ## Project layout
@@ -74,17 +103,31 @@ python3 BootWright/dependencies.py --install
 ```
 BootWright/
   __init__.py       package metadata
-  menu.py           interactive CLI flow
+  cli.py             `bootwright` console-script entry point
+  menu.py            interactive CLI flow
   pxe.py             iPXE clone/configure/build
-  tftp.py             TFTP root creation and image/ISO deployment
+  tftp.py            TFTP root creation and image/ISO deployment
+  bootscript.py      renders the on-target boot.ipxe menu
+  services.py        TFTP/HTTP service setup and DHCP configuration advice
   dependencies.py    cross-platform build dependency checker/installer
-  vendor/ipxe/        iPXE source (cloned at runtime, not tracked in git)
+  winpe.py           WinPE + Windows-install-fileshare setup guidance
+  vendor/ipxe/       iPXE source (cloned at runtime, not tracked in git)
+tests/               pytest suite for the modules above
+```
+
+## Testing
+
+```sh
+pip install -e ".[dev]"
+pytest
+pylint src/BootWright tests
 ```
 
 ## Status
 
 Actively under development -- expect the feature/target catalogs and ISO
-list to keep growing.
+list to keep growing. See [ROADMAP.md](ROADMAP.md) for what's implemented
+and what's next.
 
 ## License
 
