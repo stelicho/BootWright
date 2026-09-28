@@ -123,11 +123,26 @@ pytest
 pylint src/BootWright tests
 ```
 
+## Versioning
+
+BootWright follows [Semantic Versioning](https://semver.org/):
+`MAJOR.MINOR.PATCH`. While the major version is `0` (pre-1.0), the CLI's
+flags, module APIs, and catalogs may still change between minor versions
+without a deprecation period -- treat `0.x` as "usable, but not yet a
+stability guarantee." Once `1.0.0` ships, `MAJOR` bumps mean breaking
+changes, `MINOR` bumps mean backwards-compatible features, and `PATCH`
+bumps mean backwards-compatible fixes.
+
+Each release is tagged `vMAJOR.MINOR.PATCH` (e.g. `v0.2.0`) and recorded in
+[CHANGELOG.md](CHANGELOG.md). The version in `pyproject.toml` and
+`BootWright.__version__` always matches the most recent tag.
+
 ## Status
 
 Actively under development -- expect the feature/target catalogs and ISO
 list to keep growing. See [ROADMAP.md](ROADMAP.md) for what's implemented
-and what's next.
+and what's next, and [CHANGELOG.md](CHANGELOG.md) for what's already
+shipped.
 
 ## License
 

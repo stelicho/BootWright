@@ -4,7 +4,7 @@ _Last updated: 2026-09-27. Living doc -- edit freely as priorities change._
 
 ## Current status
 
-BootWright (v0.1.0) is a working, end-to-end CLI for building a PXE boot
+BootWright (v0.2.0) is a working, end-to-end CLI for building a PXE boot
 environment on top of iPXE. Every module below is implemented (no stubs),
 but the catalogs it draws from (features, targets, distro ISOs) are
 intentionally small starter sets meant to grow over time.

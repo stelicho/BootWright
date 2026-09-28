@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bootwright"
-version = "0.1.0"
+version = "0.2.0"
 description = "Automate building and deploying a PXE boot environment on top of iPXE."
 readme = "README.md"
 requires-python = ">=3.11"
